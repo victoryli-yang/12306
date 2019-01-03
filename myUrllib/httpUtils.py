@@ -1,13 +1,11 @@
 # -*- coding: utf8 -*-
 import json
 import socket
-import urllib
 from collections import OrderedDict
 from time import sleep
-
 import requests
-
 from config import logger
+import wrapcache
 
 
 def _set_header_default():
@@ -102,6 +100,8 @@ class HTTPClient(object):
         req_url = urls.get("req_url", "")
         re_try = urls.get("re_try", 0)
         s_time = urls.get("s_time", 0)
+        is_cdn = urls.get("is_cdn", False)
+        is_test_cdn = urls.get("is_test_cdn", False)
         error_data = {"code": 99999, "message": u"重试次数达到上限"}
         if data:
             method = "post"
@@ -114,8 +114,14 @@ class HTTPClient(object):
             logger.log(
                 u"url: {0}\n入参: {1}\n请求方式: {2}\n".format(req_url, data, method, ))
         self.setHeadersHost(urls["Host"])
-        if self.cdn:
-            url_host = self.cdn
+        if is_test_cdn:
+            url_host = self._cdn
+        elif is_cdn:
+            if self._cdn:
+                print(u"当前请求cdn为{}".format(self._cdn))
+                url_host = self._cdn
+            else:
+                url_host = urls["Host"]
         else:
             url_host = urls["Host"]
         for i in range(re_try):
@@ -130,7 +136,7 @@ class HTTPClient(object):
                                            allow_redirects=allow_redirects,
                                            verify=False,
                                            **kwargs)
-                if response.status_code == 200:
+                if response.status_code == 200 or response.status_code == 302:
                     if response.content:
                         if is_logger:
                             logger.log(
